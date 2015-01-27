@@ -1,5 +1,8 @@
 # Mailboxer [![Build Status](https://travis-ci.org/mailboxer/mailboxer.svg?branch=master)](https://travis-ci.org/mailboxer/mailboxer) [![Gem Version](https://badge.fury.io/rb/mailboxer.png)](http://badge.fury.io/rb/mailboxer) [![](https://gemnasium.com/ging/mailboxer.png)](https://gemnasium.com/ging/mailboxer)
 
+UPDATE:
+This gem is forked from the orignal mailboxer gem and adapted for a custom project! You should not use it, because it contains specific stuff, which probably would not work for your project.
+
 This project is based on the need for a private message system for [ging
 / social\_stream](https://github.com/ging/social_stream). Instead of creating our core message system heavily
 dependent on our development, we are trying to implement a generic and
