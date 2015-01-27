@@ -2,13 +2,17 @@ class Mailboxer::Conversation < ActiveRecord::Base
   self.table_name = :mailboxer_conversations
 
   attr_accessible :subject if Mailboxer.protected_attributes?
+  
+  attr_accessor :body, :recipients_for_new, :create_new_conversation_process
 
   has_many :opt_outs, :dependent => :destroy, :class_name => "Mailboxer::Conversation::OptOut"
   has_many :messages, :dependent => :destroy, :class_name => "Mailboxer::Message"
   has_many :receipts, :through => :messages,  :class_name => "Mailboxer::Receipt"
 
+  validates :recipients_for_new, :presence => true, :on => :create, :if => Proc.new { |c| c.create_new_conversation_process == true }
   validates :subject, :presence => true,
                       :length => { :maximum => Mailboxer.subject_max_length }
+  validates :body, :presence => true, :on => :create, :if => Proc.new { |c| c.create_new_conversation_process == true }
 
   before_validation :clean
 
@@ -103,6 +107,14 @@ class Mailboxer::Conversation < ActiveRecord::Base
   def receipts_for(participant)
     Mailboxer::Receipt.conversation(self).recipient(participant)
   end
+  
+#  def clean_recipients_for(participant)
+#    clean_recipients = []
+#    self.last_message.recipients.each do |recipient|
+#      clean_recipients << recipient if recipient.mailbox.inbox.include?(self)
+#    end
+#    clean_recipients
+#  end
 
   #Returns the number of messages of the conversation
   def count_messages
@@ -178,6 +190,35 @@ class Mailboxer::Conversation < ActiveRecord::Base
   # tells if participant is opt in
   def has_subscriber?(participant)
     !opt_outs.unsubscriber(participant).any?
+  end
+  
+  # add multiple recipients to a conversation
+  # => only possible through the originator
+  # => generate a new message to inform other members of the conversation about the new recipients
+  def add_new_recipients(new_recipients)
+    new_added_recipients = []
+    new_recipients.each do |new_recipient|
+      next if self.is_participant?(new_recipient)
+      self.add_participant(new_recipient)
+      new_added_recipients << new_recipient
+    end
+    self.originator.reply_to_conversation(self, "Has added #{new_added_recipients.map(&:display_name).join(", ")} to this conversation...", self.subject, false) unless new_added_recipients.empty?
+  end
+  
+  # remove multiple recipients from a conversation
+  # => only possible through the originator
+  # => generate a new message to inform other members of the conversation about the deleted recipients
+  def remove_recipients(recipients)
+    user_ids = self.receipts.map(&:receiver_id).uniq
+    removed_recipients = []
+    recipients.map(&:to_i).each do |user_id|
+      if user_ids.include?(user_id) && user_id != self.originator.id
+        user = User.where(:id => user_id).first
+        user.delete_conversation(self)
+        removed_recipients << user
+      end
+    end
+    self.originator.reply_to_conversation(self, "Has removed #{removed_recipients.map(&:display_name).join(", ")} from this conversation...", self.subject, false) unless removed_recipients.empty?
   end
 
   protected
