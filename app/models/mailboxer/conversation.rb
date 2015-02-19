@@ -3,7 +3,7 @@ class Mailboxer::Conversation < ActiveRecord::Base
 
   attr_accessible :subject if Mailboxer.protected_attributes?
   
-  attr_accessor :body, :recipients_for_new, :create_new_conversation_process
+  attr_accessor :body, :recipients_for_new, :create_new_conversation_process, :datafile_ids
 
   has_many :opt_outs, :dependent => :destroy, :class_name => "Mailboxer::Conversation::OptOut"
   has_many :messages, :dependent => :destroy, :class_name => "Mailboxer::Message"
@@ -219,6 +219,17 @@ class Mailboxer::Conversation < ActiveRecord::Base
       end
     end
     self.originator.reply_to_conversation(self, "Has removed #{removed_recipients.map(&:display_name).join(", ")} from this conversation...", self.subject, false) unless removed_recipients.empty?
+  end
+  
+  # TODO: make this with sql!
+  def datafiles
+    datafiles = []
+    self.messages.each do |message|
+      message.datafiles.each do |datafile|
+        datafiles << datafile
+      end
+    end
+    datafiles
   end
 
   protected

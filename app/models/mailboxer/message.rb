@@ -3,6 +3,8 @@ class Mailboxer::Message < Mailboxer::Notification
   self.table_name = :mailboxer_notifications
 
   belongs_to :conversation, :class_name => "Mailboxer::Conversation", :validate => true, :autosave => true
+  has_many :datafile_associations, :as => :datafileable, :class_name => "DatafileAssociation", :dependent => :destroy
+  has_many :datafiles, :through => :datafile_associations, :class_name => "Datafile"
   validates_presence_of :sender
 
   class_attribute :on_deliver_callback
@@ -45,4 +47,33 @@ class Mailboxer::Message < Mailboxer::Notification
     end
     sender_receipt
   end
+  
+  # handle newly added datafiles
+  # => first add the datafiles to the current message
+  # => second set the correct permissions for all recipients of the current message
+  def handle_new_datafiles(datafile_ids)
+    datafiles = self.sender.filemanager.datafiles.where(:id => datafile_ids.map(&:to_i))
+    add_datafiles(datafiles)
+    add_permissions_for(datafiles)
+    self
+  end
+
+  # add datafiles to the current message
+  def add_datafiles(datafiles)
+    datafiles.each do |datafile|
+      self.datafiles << datafile unless self.datafiles.include?(datafile)
+    end
+  end
+
+  # add new permissions for all datafiles for all recipients
+  # do not add a permission if datafiles are public!
+  def add_permissions_for(datafiles)
+    self.recipients.each do |recipient|
+      datafiles.each do |datafile|
+        next if datafile.public?
+        recipient.add_permission_for(datafile)
+      end
+    end
+  end
+
 end
