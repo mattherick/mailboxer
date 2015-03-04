@@ -75,5 +75,9 @@ class Mailboxer::Message < Mailboxer::Notification
       end
     end
   end
+  
+  def as_folder_name
+    "message-#{self.id}-#{self.sender.login}"
+  end
 
 end
