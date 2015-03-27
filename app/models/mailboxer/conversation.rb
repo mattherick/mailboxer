@@ -8,6 +8,8 @@ class Mailboxer::Conversation < ActiveRecord::Base
   has_many :opt_outs, :dependent => :destroy, :class_name => "Mailboxer::Conversation::OptOut"
   has_many :messages, :dependent => :destroy, :class_name => "Mailboxer::Message"
   has_many :receipts, :through => :messages,  :class_name => "Mailboxer::Receipt"
+  has_many :datafile_associations, :as => :datafileable, :class_name => "DatafileAssociation", :dependent => :destroy
+  has_many :datafiles, :through => :datafile_associations, :class_name => "Datafile"
 
   validates :recipients_for_new, :presence => true, :on => :create, :if => Proc.new { |c| c.create_new_conversation_process == true }
   validates :subject, :presence => true,
@@ -219,17 +221,6 @@ class Mailboxer::Conversation < ActiveRecord::Base
       end
     end
     self.originator.reply_to_conversation(self, "Has removed #{removed_recipients.map(&:display_name).join(", ")} from this conversation...", self.subject, false) unless removed_recipients.empty?
-  end
-  
-  # TODO: make this with sql!
-  def datafiles
-    datafiles = []
-    self.messages.each do |message|
-      message.datafiles.each do |datafile|
-        datafiles << datafile
-      end
-    end
-    datafiles
   end
 
   protected

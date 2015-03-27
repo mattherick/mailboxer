@@ -49,7 +49,7 @@ class Mailboxer::Message < Mailboxer::Notification
   end
   
   # handle newly added datafiles
-  # => first add the datafiles to the current message
+  # => first add the datafiles to the conversation of the message and the current_message itself
   # => second set the correct permissions for all recipients of the current message
   def handle_new_datafiles(datafile_ids)
     datafiles = self.sender.filemanager.datafiles.where(:id => datafile_ids.map(&:to_i))
@@ -60,8 +60,10 @@ class Mailboxer::Message < Mailboxer::Notification
 
   # add datafiles to the current message
   def add_datafiles(datafiles)
+    conversation = self.conversation
     datafiles.each do |datafile|
       self.datafiles << datafile unless self.datafiles.include?(datafile)
+      conversation.datafiles << datafile unless conversation.datafiles.include?(datafile)
     end
   end
 
@@ -74,10 +76,6 @@ class Mailboxer::Message < Mailboxer::Notification
         recipient.add_permission_for(datafile)
       end
     end
-  end
-  
-  def as_folder_name
-    "message-#{self.id}-#{self.sender.login}"
   end
 
 end
