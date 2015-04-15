@@ -121,7 +121,32 @@ module Mailboxer
 
         reply(conversation, conversation.last_message.recipients, reply_body, subject, sanitize_text, attachment)
       end
+      
+      def notify_recipient_about(what, new_recipient, conversation)
+        i18n_locale = I18n.locale
+        I18n.locale = new_recipient.saved_locale.to_sym
+        if what == "added"
+          body = I18n.t("lib.mailboxer.models.messageable.notify_recipient_about_added_body")
+        elsif what == "removed"
+          body = I18n.t("lib.mailboxer.models.messageable.notify_recipient_about_removed_body")
+        else
+          raise "#{what} is not implemented yet!"
+        end
 
+        response = Mailboxer::SystemMessageBuilder.new({
+          :sender       => self,
+          :conversation => conversation,
+          :recipients   => new_recipient,
+          :body         => body,
+          :subject      => conversation.subject,
+          :system       => true,
+          :system_case  => what
+        }).build
+
+        response.deliver true, false
+        I18n.locale = i18n_locale
+      end
+  
       #Mark the object as read for messageable.
       #
       #Object can be:

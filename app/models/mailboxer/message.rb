@@ -6,12 +6,16 @@ class Mailboxer::Message < Mailboxer::Notification
   has_many :datafile_associations, :as => :datafileable, :class_name => "DatafileAssociation", :dependent => :destroy
   has_many :datafiles, :through => :datafile_associations, :class_name => "Datafile"
   validates_presence_of :sender
+  
+  validates :system_case, :inclusion => { :in => ["added", "removed"] }, :allow_blank => true
 
   class_attribute :on_deliver_callback
   protected :on_deliver_callback
   scope :conversation, lambda { |conversation|
     where(:conversation_id => conversation.id)
   }
+
+  scope :not_system, -> { where(:system => false) }
 
   mount_uploader :attachment, AttachmentUploader
 

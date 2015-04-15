@@ -102,7 +102,7 @@ class Mailboxer::Conversation < ActiveRecord::Base
 
   #Last message in the conversation.
   def last_message
-    @last_message ||= messages.order('created_at DESC').first
+    @last_message ||= messages.not_system.order('created_at DESC').first
   end
 
   #Returns the receipts of the conversation for one participants
@@ -131,7 +131,7 @@ class Mailboxer::Conversation < ActiveRecord::Base
 
 	#Adds a new participant to the conversation
 	def add_participant(participant)
-		messages.each do |message|
+		messages.not_system.each do |message|
       Mailboxer::ReceiptBuilder.new({
         :notification => message,
         :receiver     => participant,
@@ -194,33 +194,28 @@ class Mailboxer::Conversation < ActiveRecord::Base
     !opt_outs.unsubscriber(participant).any?
   end
   
-  # add multiple recipients to a conversation
+  # add a new recipient to a conversation
   # => only possible through the originator
-  # => generate a new message to inform other members of the conversation about the new recipients
-  def add_new_recipients(new_recipients)
-    new_added_recipients = []
-    new_recipients.each do |new_recipient|
-      next if self.is_participant?(new_recipient)
+  # => generate a new system message to notify inside the conversation about the new recipient
+  # => send an email to the new recipient
+  def add_new_recipient(new_recipient)
+    unless self.last_message.recipients.include?(new_recipient)
       self.add_participant(new_recipient)
-      new_added_recipients << new_recipient
+      self.originator.notify_recipient_about("added", new_recipient, self)
     end
-    self.originator.reply_to_conversation(self, "Has added #{new_added_recipients.map(&:display_name).join(", ")} to this conversation...", self.subject, false) unless new_added_recipients.empty?
   end
-  
-  # remove multiple recipients from a conversation
+
+  # remove a recipient from a conversation
   # => only possible through the originator
-  # => generate a new message to inform other members of the conversation about the deleted recipients
-  def remove_recipients(recipients)
-    user_ids = self.receipts.map(&:receiver_id).uniq
-    removed_recipients = []
-    recipients.map(&:to_i).each do |user_id|
-      if user_ids.include?(user_id) && user_id != self.originator.id
-        user = User.where(:id => user_id).first
-        user.delete_conversation(self)
-        removed_recipients << user
-      end
+  # => generate a new system message to notfiy inside the conversation about the removed recipient
+  # => send an email to the removed recipient
+  def remove_recipient(recipient_id)
+    recipient_id = recipient_id.to_i
+    if self.receipts.map(&:receiver_id).uniq.include?(recipient_id) && recipient_id != self.originator.id
+      user = User.where(:id => recipient_id).first
+      user.delete_conversation(self)
+      self.originator.notify_recipient_about("removed", user, self)
     end
-    self.originator.reply_to_conversation(self, "Has removed #{removed_recipients.map(&:display_name).join(", ")} from this conversation...", self.subject, false) unless removed_recipients.empty?
   end
 
   protected
