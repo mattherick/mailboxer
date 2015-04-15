@@ -81,5 +81,17 @@ class Mailboxer::Message < Mailboxer::Notification
       end
     end
   end
+  
+  def system?
+    self.system
+  end
+  
+  def added?
+    self.system_case == "added"
+  end
+  
+  def removed?
+    self.system_case == "removed"
+  end
 
 end
