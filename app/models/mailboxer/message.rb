@@ -7,7 +7,7 @@ class Mailboxer::Message < Mailboxer::Notification
   has_many :datafiles, :through => :datafile_associations, :class_name => "Datafile"
   validates_presence_of :sender
   
-  validates :system_case, :inclusion => { :in => ["added", "removed"] }, :allow_blank => true
+  validates :system_case, :inclusion => { :in => ["added", "removed", "left"] }, :allow_blank => true
 
   class_attribute :on_deliver_callback
   protected :on_deliver_callback
@@ -47,6 +47,25 @@ class Mailboxer::Message < Mailboxer::Notification
 
       self.recipients = nil
 
+      on_deliver_callback.call(self) if on_deliver_callback
+    end
+    sender_receipt
+  end
+  
+  def deliver_system_message(person)
+    #Receiver receipts
+    temp_receipts = recipients.map { |r| build_receipt(r, 'inbox') }
+
+    #Sender receipt
+    sender_receipt = build_receipt(sender, 'sentbox', true)
+
+    temp_receipts << sender_receipt
+    
+    if temp_receipts.all?(&:valid?)
+      temp_receipts.each(&:save!)
+      Mailboxer::MailDispatcher.new(self, [person]).call unless self.left?
+      conversation.touch
+      self.recipients = nil
       on_deliver_callback.call(self) if on_deliver_callback
     end
     sender_receipt
@@ -92,6 +111,10 @@ class Mailboxer::Message < Mailboxer::Notification
   
   def removed?
     self.system_case == "removed"
+  end
+  
+  def left?
+    self.system_case == "left"
   end
 
 end

@@ -122,28 +122,36 @@ module Mailboxer
         reply(conversation, conversation.last_message.recipients, reply_body, subject, sanitize_text, attachment)
       end
       
-      def notify_recipient_about(what, new_recipient, conversation)
+      def notify_recipient_about(what, person, conversation)
         i18n_locale = I18n.locale
-        I18n.locale = new_recipient.saved_locale.to_sym
-        if what == "added"
+        I18n.locale = person.saved_locale.to_sym
+        case what
+        when "added"
           body = I18n.t("lib.mailboxer.models.messageable.notify_recipient_about_added_body")
-        elsif what == "removed"
+          recipients = conversation.last_message.recipients + [person]
+        when "removed"
           body = I18n.t("lib.mailboxer.models.messageable.notify_recipient_about_removed_body")
+          recipients = conversation.last_message.recipients
+        when "left"
+          body = I18n.t("lib.mailboxer.models.messageable.notify_recipient_about_left_body")
+          recipients = conversation.last_message.recipients
         else
           raise "#{what} is not implemented yet!"
         end
 
         response = Mailboxer::SystemMessageBuilder.new({
-          :sender       => self,
-          :conversation => conversation,
-          :recipients   => new_recipient,
-          :body         => body,
-          :subject      => conversation.subject,
-          :system       => true,
-          :system_case  => what
+          :sender           => self,
+          :conversation     => conversation,
+          :recipients       => recipients,
+          :notified_object  => person,
+          :body             => body,
+          :subject          => conversation.subject,
+          :system           => true,
+          :system_case      => what
         }).build
 
-        response.deliver true, false
+        response.recipients.delete(self)
+        response.deliver_system_message(person)
         I18n.locale = i18n_locale
       end
   
