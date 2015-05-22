@@ -124,7 +124,7 @@ module Mailboxer
       
       def notify_recipient_about(what, person, conversation)
         i18n_locale = I18n.locale
-        I18n.locale = person.saved_locale.to_sym
+        I18n.locale = person.default_locale.to_sym
         case what
         when "added"
           body = I18n.t("lib.mailboxer.models.messageable.notify_recipient_about_added_body")
