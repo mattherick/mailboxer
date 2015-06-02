@@ -117,7 +117,7 @@ class Mailboxer::Message < Mailboxer::Notification
   # add new permissions for all datafiles for all recipients
   # do not add a permission if datafiles are public!
   def add_permissions_for(datafiles)
-    self.users.each do |recipient|
+    self.conversation.users.each do |recipient|
       datafiles.each do |datafile|
         next if datafile.public?
         recipient.add_permission_for(datafile)
