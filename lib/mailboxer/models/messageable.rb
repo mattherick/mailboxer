@@ -85,19 +85,20 @@ module Mailboxer
 
       #Basic reply method. USE NOT RECOMENDED.
       #Use reply_to_sender, reply_to_all and reply_to_conversation instead.
-      def reply(conversation, recipients, reply_body, subject=nil, sanitize_text=true, attachment=nil)
+      def reply(conversation, reply_body, subject=nil, sanitize_text=true, attachment=nil)
+        users = conversation.users - [self]
         subject = subject || "#{conversation.subject}"
         response = Mailboxer::MessageBuilder.new({
           :sender       => self,
           :conversation => conversation,
-          :recipients   => recipients,
+          :recipients   => users,
           :body         => reply_body,
           :subject      => subject,
           :attachment   => attachment
         }).build
 
         response.recipients.delete(self)
-        response.deliver true, sanitize_text
+        response.deliver_user_message(users, sanitize_text)
       end
 
       #Replies to the sender of the message in the conversation
@@ -112,14 +113,13 @@ module Mailboxer
 
       #Replies to all the recipients of the last message in the conversation and untrash any trashed message by messageable
       #if should_untrash is set to true (this is so by default)
-      def reply_to_conversation(conversation, reply_body, subject=nil, should_untrash=true, sanitize_text=true, attachment=nil)
+      def reply_to_conversation(conversation, sender, reply_body, subject=nil, should_untrash=true, sanitize_text=true, attachment=nil)
         #move conversation to inbox if it is currently in the trash and should_untrash parameter is true.
         if should_untrash && mailbox.is_trashed?(conversation)
           mailbox.receipts_for(conversation).untrash
           mailbox.receipts_for(conversation).mark_as_not_deleted
         end
-
-        reply(conversation, conversation.last_message.recipients, reply_body, subject, sanitize_text, attachment)
+        reply(conversation, reply_body, subject, sanitize_text, attachment)
       end
       
       def notify_recipient_about(what, person, conversation)
@@ -128,13 +128,10 @@ module Mailboxer
         case what
         when "added"
           body = I18n.t("lib.mailboxer.models.messageable.notify_recipient_about_added_body")
-          recipients = conversation.last_message.recipients + [person]
         when "removed"
           body = I18n.t("lib.mailboxer.models.messageable.notify_recipient_about_removed_body")
-          recipients = conversation.last_message.recipients
         when "left"
           body = I18n.t("lib.mailboxer.models.messageable.notify_recipient_about_left_body")
-          recipients = conversation.last_message.recipients
         else
           raise "#{what} is not implemented yet!"
         end
@@ -142,7 +139,7 @@ module Mailboxer
         response = Mailboxer::SystemMessageBuilder.new({
           :sender           => self,
           :conversation     => conversation,
-          :recipients       => recipients,
+          :recipients       => conversation.users,
           :notified_object  => person,
           :body             => body,
           :subject          => conversation.subject,
@@ -151,7 +148,7 @@ module Mailboxer
         }).build
 
         response.recipients.delete(self)
-        response.deliver_system_message(person)
+        response.deliver_system_message(conversation.users, person)
         I18n.locale = i18n_locale
       end
   

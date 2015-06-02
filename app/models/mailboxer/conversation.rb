@@ -10,6 +10,8 @@ class Mailboxer::Conversation < ActiveRecord::Base
   has_many :receipts, :through => :messages,  :class_name => "Mailboxer::Receipt"
   has_many :datafile_associations, :as => :datafileable, :class_name => "DatafileAssociation", :dependent => :destroy
   has_many :datafiles, :through => :datafile_associations, :class_name => "Datafile"
+  has_many :members, :dependent => :destroy, :class_name => "Member"
+  has_many :users, :through => :members, :class_name => "User"
 
   validates :recipients_for_new, :presence => true, :on => :create, :if => Proc.new { |c| c.create_new_conversation_process == true }
   validates :subject, :presence => true,
@@ -194,13 +196,22 @@ class Mailboxer::Conversation < ActiveRecord::Base
     !opt_outs.unsubscriber(participant).any?
   end
   
+  # add all new recipients to a new conversation
+  # => this is called during the creation process of a new conversation
+  # => there is no extra notification mail necessary!
+  def add_new_recipients(recipients)
+    recipients.each do |recipient|
+      self.users << recipient
+    end
+  end
+  
   # add a new recipient to a conversation
   # => only possible through the originator
   # => generate a new system message to notify inside the conversation about the new recipient
   # => send an email to the new recipient
   def add_new_recipient(new_recipient)
-    unless self.last_message.recipients.include?(new_recipient)
-      self.add_participant(new_recipient)
+    unless self.users.include?(new_recipient)
+      self.users << new_recipient
       self.originator.notify_recipient_about("added", new_recipient, self)
     end
   end
@@ -210,9 +221,8 @@ class Mailboxer::Conversation < ActiveRecord::Base
   # => generate a new system message to notfiy inside the conversation about the removed recipient
   # => send an email to the removed recipient
   def remove_recipient(recipient_id)
-    recipient_id = recipient_id.to_i
-    if self.receipts.map(&:receiver_id).uniq.include?(recipient_id) && recipient_id != self.originator.id
-      user = User.where(:id => recipient_id).first
+    if recipient_id != self.originator.id
+      user = self.users.where(:id => recipient_id).first
       user.delete_conversation(self)
       self.originator.notify_recipient_about("removed", user, self)
     end

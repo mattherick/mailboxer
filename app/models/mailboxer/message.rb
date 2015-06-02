@@ -52,9 +52,33 @@ class Mailboxer::Message < Mailboxer::Notification
     sender_receipt
   end
   
-  def deliver_system_message(person)
+  def deliver_user_message(users, should_clean)
+    self.clean if should_clean
+    
     #Receiver receipts
-    temp_receipts = recipients.map { |r| build_receipt(r, 'inbox') }
+    temp_receipts = users.map { |r| build_receipt(r, 'inbox') }
+
+    #Sender receipt
+    sender_receipt = build_receipt(sender, 'sentbox', true)
+
+    temp_receipts << sender_receipt
+
+    if temp_receipts.all?(&:valid?)
+      temp_receipts.each(&:save!)
+      Mailboxer::MailDispatcher.new(self, users).call
+
+      conversation.touch
+      self.recipients = nil
+
+      on_deliver_callback.call(self) if on_deliver_callback
+    end
+    sender_receipt
+  end
+  
+  def deliver_system_message(users, person)
+    #Receiver receipts
+    receiver_users = users - [sender]
+    temp_receipts = receiver_users.map { |r| build_receipt(r, 'inbox') }
 
     #Sender receipt
     sender_receipt = build_receipt(sender, 'sentbox', true)
@@ -93,7 +117,7 @@ class Mailboxer::Message < Mailboxer::Notification
   # add new permissions for all datafiles for all recipients
   # do not add a permission if datafiles are public!
   def add_permissions_for(datafiles)
-    self.recipients.each do |recipient|
+    self.users.each do |recipient|
       datafiles.each do |datafile|
         next if datafile.public?
         recipient.add_permission_for(datafile)
