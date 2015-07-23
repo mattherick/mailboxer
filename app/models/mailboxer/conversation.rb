@@ -227,6 +227,10 @@ class Mailboxer::Conversation < ActiveRecord::Base
       self.originator.notify_recipient_about("removed", user, self)
     end
   end
+  
+  def truncated(size=26)
+    self.subject.truncate(size, omission: "...")
+  end
 
   protected
 
