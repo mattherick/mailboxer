@@ -229,7 +229,7 @@ class Mailboxer::Conversation < ActiveRecord::Base
   end
   
   def truncated_subject(size=30)
-    self.subject.truncate(size, omission: "...")
+    self.subject.truncate(size, omission: "...").upcase
   end
 
   protected
