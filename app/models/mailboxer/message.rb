@@ -119,7 +119,6 @@ class Mailboxer::Message < Mailboxer::Notification
   def add_permissions_for(datafiles)
     self.conversation.users.each do |recipient|
       datafiles.each do |datafile|
-        next if datafile.public?
         recipient.add_permission_for(datafile)
       end
     end
